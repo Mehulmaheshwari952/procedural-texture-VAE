@@ -1,0 +1,17 @@
+# Python
+venv/
+dl_env/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Data and models — too large for git
+data/
+models/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Storeprocedural-texture-VAE/
