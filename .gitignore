@@ -10,6 +10,7 @@ __pycache__/
 # Data and models — too large for git
 data/
 models/
+archive/
 
 # Jupyter
 .ipynb_checkpoints/
