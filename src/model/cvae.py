@@ -166,18 +166,30 @@ def get_perceptual_loss_fn(device):
         _perceptual_loss_fn = PerceptualLoss().to(device)
     return _perceptual_loss_fn
 
-
 def cvae_loss(x_recon, x, mu, log_var, beta: float = 1.0, device=None):
-    # pixel reconstruction
     recon_loss = F.mse_loss(x_recon, x, reduction="sum")
 
-    # perceptual loss — compares VGG feature maps
-    # this is what makes outputs sharp instead of blurry
-    perc_fn    = get_perceptual_loss_fn(device or x.device)
-    perc_loss  = perc_fn(x_recon, x) * 10.0   # scale up to match mse magnitude
+    perc_fn   = get_perceptual_loss_fn(device or x.device)
+    perc_loss = perc_fn(x_recon, x) * 10.0
 
-    # KL divergence
-    kl_loss    = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    kl_loss   = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
 
-    total = recon_loss + perc_loss + beta * kl_loss
+    # edge consistency loss — forces decoder to generate
+    # uniform texture all the way to the borders, no vignetting
+    top    = x_recon[:, :, :4,  :]      # (B, 3, 4, 128)
+    bottom = x_recon[:, :, -4:, :]      # (B, 3, 4, 128)
+    left   = x_recon[:, :, :,  :4]      # (B, 3, 128, 4)
+    right  = x_recon[:, :, :, -4:]      # (B, 3, 128, 4)
+
+    # use mean of center region as reference, not expand
+    center_mean = x_recon[:, :, 62:66, 62:66].mean(dim=[2,3], keepdim=True)  # (B, 3, 1, 1)
+
+    edge_loss = (
+        F.mse_loss(top,    center_mean.expand_as(top))    +
+        F.mse_loss(bottom, center_mean.expand_as(bottom)) +
+        F.mse_loss(left,   center_mean.expand_as(left))   +
+        F.mse_loss(right,  center_mean.expand_as(right))
+    ) * 5.0
+
+    total = recon_loss + perc_loss + beta * kl_loss + edge_loss
     return total, recon_loss, kl_loss

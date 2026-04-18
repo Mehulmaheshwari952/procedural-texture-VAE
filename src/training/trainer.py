@@ -95,6 +95,20 @@ class Trainer:
         self.train_losses = []
         self.val_losses   = []
         self.best_val     = float("inf")
+        
+        resume_path = config.get("resume", None)
+        if resume_path and os.path.exists(resume_path):
+            print(f"\nResuming from {resume_path}")
+            ckpt = torch.load(resume_path, map_location=self.device)
+            self.model.load_state_dict(ckpt["model"])
+            self.optimizer.load_state_dict(ckpt["optimizer"])
+            self.start_epoch = ckpt["epoch"] + 1
+            self.best_val    = ckpt["val_loss"]
+            print(f"Resumed from epoch {ckpt['epoch']}, val loss {ckpt['val_loss']:.1f}")
+        else:
+            self.start_epoch = 1
+            self.best_val    = float("inf")
+            print("\nNo checkpoint found, starting fresh training") 
 
     def get_beta(self, epoch: int) -> float:
         # sigmoid warmup — stays near 0 for a long time then smoothly rises
@@ -220,8 +234,7 @@ class Trainer:
 
     def train(self):
         print(f"\nStarting training for {self.config['epochs']} epochs\n")
-
-        for epoch in range(1, self.config["epochs"] + 1):
+        for epoch in range(self.start_epoch, self.config["epochs"] + 1):
             # train
             train_loss, recon, kl = self.train_epoch(epoch)
 
