@@ -79,50 +79,68 @@ class ResNetEncoder(nn.Module):
         return mu, log_var
 
 
+class ResBlock(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, 3, padding=1),
+            nn.InstanceNorm2d(channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channels, channels, 3, padding=1),
+            nn.InstanceNorm2d(channels),
+        )
+
+    def forward(self, x):
+        return x + self.block(x)   # residual connection
+
+
 class TextureDecoder(nn.Module):
     def __init__(self, latent_dim: int, num_classes: int):
         super().__init__()
 
         self.label_embedding = nn.Embedding(num_classes, 64)
 
-        # project latent + label into spatial feature map
         self.fc = nn.Sequential(
             nn.Linear(latent_dim + 64, 512 * 4 * 4),
             nn.ReLU()
         )
 
-        self.deconv = nn.Sequential(
+        self.decoder = nn.Sequential(
             # 512 x 4 x 4 → 256 x 8 x 8
-            nn.ConvTranspose2d(512, 256, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(256),
+            nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1),
+            nn.InstanceNorm2d(256),
             nn.ReLU(),
+            ResBlock(256),
 
             # 256 x 8 x 8 → 128 x 16 x 16
-            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(128),
+            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),
+            nn.InstanceNorm2d(128),
             nn.ReLU(),
+            ResBlock(128),
 
             # 128 x 16 x 16 → 64 x 32 x 32
-            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(64),
+            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),
+            nn.InstanceNorm2d(64),
             nn.ReLU(),
+            ResBlock(64),
 
             # 64 x 32 x 32 → 32 x 64 x 64
-            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(32),
+            nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),
+            nn.InstanceNorm2d(32),
             nn.ReLU(),
+            ResBlock(32),
 
             # 32 x 64 x 64 → 3 x 128 x 128
-            nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1),
+            nn.ConvTranspose2d(32, 3, 4, stride=2, padding=1),
             nn.Tanh()
         )
 
     def forward(self, z, label):
-        label_emb = self.label_embedding(label)          # (B, 64)
-        z         = torch.cat([z, label_emb], dim=1)     # (B, latent_dim + 64)
-        x         = self.fc(z)                           # (B, 512*4*4)
-        x         = x.view(x.size(0), 512, 4, 4)        # (B, 512, 4, 4)
-        x         = self.deconv(x)                       # (B, 3, 128, 128)
+        label_emb = self.label_embedding(label)
+        z         = torch.cat([z, label_emb], dim=1)
+        x         = self.fc(z)
+        x         = x.view(x.size(0), 512, 4, 4)
+        x         = self.decoder(x)
         return x
 
 
@@ -174,22 +192,5 @@ def cvae_loss(x_recon, x, mu, log_var, beta: float = 1.0, device=None):
 
     kl_loss   = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
 
-    # edge consistency loss — forces decoder to generate
-    # uniform texture all the way to the borders, no vignetting
-    top    = x_recon[:, :, :4,  :]      # (B, 3, 4, 128)
-    bottom = x_recon[:, :, -4:, :]      # (B, 3, 4, 128)
-    left   = x_recon[:, :, :,  :4]      # (B, 3, 128, 4)
-    right  = x_recon[:, :, :, -4:]      # (B, 3, 128, 4)
-
-    # use mean of center region as reference, not expand
-    center_mean = x_recon[:, :, 62:66, 62:66].mean(dim=[2,3], keepdim=True)  # (B, 3, 1, 1)
-
-    edge_loss = (
-        F.mse_loss(top,    center_mean.expand_as(top))    +
-        F.mse_loss(bottom, center_mean.expand_as(bottom)) +
-        F.mse_loss(left,   center_mean.expand_as(left))   +
-        F.mse_loss(right,  center_mean.expand_as(right))
-    ) * 5.0
-
-    total = recon_loss + perc_loss + beta * kl_loss + edge_loss
+    total = recon_loss + perc_loss + beta * kl_loss
     return total, recon_loss, kl_loss
