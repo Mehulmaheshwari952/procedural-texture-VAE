@@ -315,6 +315,12 @@
         <div class="progress-fill"></div>
     </div>
 
+    <div id="downloadAll" style="display:none; margin-bottom:1rem;">
+        <button onclick="downloadAll()" style="padding:0.6rem 1.2rem; background:#1a1a24; border:1px solid #2a2a35; border-radius:8px; color:#aaa; cursor:pointer; font-size:0.85rem;">
+            Download All Textures
+        </button>
+    </div>
+
     <div class="gallery" id="gallery">
         <div class="empty-state">
             <div class="icon">🎨</div>
@@ -350,6 +356,17 @@
         a.href     = 'data:image/png;base64,' + b64
         a.download = filename
         a.click()
+    }
+
+    let currentData = null
+
+    function downloadAll() {
+        if (!currentData) return
+        currentData.textures.forEach((tex, i) => {
+            setTimeout(() => {
+                download(tex.image_b64, `texture_${currentData.query.replace(/ /g,'_')}_${i+1}.png`)
+            }, i * 200)
+        })
     }
 
     async function generate() {
@@ -393,6 +410,9 @@
     }
 
     function renderGallery(data) {
+        currentData = data
+        document.getElementById('downloadAll').style.display = 'block'
+
         const gallery = document.getElementById('gallery')
         gallery.innerHTML = ''
 
@@ -402,7 +422,7 @@
             card.innerHTML = `
                 <img src="data:image/png;base64,${tex.image_b64}" alt="texture ${i+1}">
                 <div class="card-footer">
-                    <span class="card-label">${tex.label}</span>
+                    <span class="card-label">${data.query}</span>
                     <span class="card-score">score: ${tex.score.toFixed(3)}</span>
                 </div>
                 <button class="download-btn" onclick="download('${tex.image_b64}', 'texture_${data.query.replace(/ /g,'_')}_${i+1}.png')">
