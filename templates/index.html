@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texture Generator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0f0f13;
+            color: #e8e8e8;
+            font-family: 'Segoe UI', sans-serif;
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 2rem 3rem;
+            border-bottom: 1px solid #2a2a35;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        header span {
+            font-size: 0.75rem;
+            background: #7c3aed;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            color: white;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        .search-section {
+            margin-bottom: 3rem;
+        }
+
+        .search-section h2 {
+            font-size: 2rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        .search-section p {
+            color: #888;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 0.85rem 1.2rem;
+            background: #1a1a24;
+            border: 1px solid #2a2a35;
+            border-radius: 8px;
+            color: #e8e8e8;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-bar input:focus {
+            border-color: #7c3aed;
+        }
+
+        .search-bar button {
+            padding: 0.85rem 1.8rem;
+            background: #7c3aed;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .search-bar button:hover { background: #6d28d9; }
+        .search-bar button:disabled {
+            background: #3a3a4a;
+            cursor: not-allowed;
+        }
+
+        .options {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .options label {
+            font-size: 0.85rem;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .options select, .options input[type=range] {
+            background: #1a1a24;
+            border: 1px solid #2a2a35;
+            border-radius: 6px;
+            color: #e8e8e8;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.85rem;
+        }
+
+        .suggestions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .suggestions button {
+            padding: 0.4rem 0.9rem;
+            background: #1a1a24;
+            border: 1px solid #2a2a35;
+            border-radius: 999px;
+            color: #aaa;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .suggestions button:hover {
+            border-color: #7c3aed;
+            color: #e8e8e8;
+        }
+
+        .status {
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: #888;
+            min-height: 1.5rem;
+        }
+
+        .status.loading { color: #7c3aed; }
+        .status.error   { color: #ef4444; }
+        .status.success { color: #22c55e; }
+
+        .progress-bar {
+            height: 2px;
+            background: #2a2a35;
+            border-radius: 2px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar.active { display: block; }
+
+        .progress-fill {
+            height: 100%;
+            background: #7c3aed;
+            width: 0%;
+            transition: width 0.3s;
+            animation: progress-anim 3s ease-in-out infinite;
+        }
+
+        @keyframes progress-anim {
+            0%   { width: 0%; }
+            50%  { width: 70%; }
+            100% { width: 90%; }
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .texture-card {
+            background: #1a1a24;
+            border: 1px solid #2a2a35;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .texture-card:hover {
+            transform: translateY(-2px);
+            border-color: #7c3aed;
+        }
+
+        .texture-card img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-footer {
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-label {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: capitalize;
+        }
+
+        .card-score {
+            font-size: 0.75rem;
+            color: #7c3aed;
+        }
+
+        .download-btn {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            background: transparent;
+            border: none;
+            border-top: 1px solid #2a2a35;
+            color: #888;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .download-btn:hover {
+            background: #7c3aed22;
+            color: #e8e8e8;
+        }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #555;
+        }
+
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 700px) {
+            .gallery { grid-template-columns: repeat(2, 1fr); }
+            header { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Texture Generator</h1>
+    <span>CLIP + Neural Synthesis</span>
+</header>
+
+<main>
+    <div class="search-section">
+        <h2>Generate Game Textures</h2>
+        <p>Describe any surface and get 6 unique texture variations powered by CLIP retrieval and VGG neural synthesis.</p>
+
+        <div class="search-bar">
+            <input type="text" id="queryInput"
+                   placeholder="e.g. rough rocky stone surface, wet mossy wood..."
+                   onkeydown="if(event.key==='Enter') generate()">
+            <button id="generateBtn" onclick="generate()">Generate</button>
+        </div>
+
+        <div class="options">
+            <label>
+                Variations:
+                <select id="numVariations">
+                    <option value="3">3</option>
+                    <option value="6" selected>6</option>
+                </select>
+            </label>
+            <label>
+                Quality:
+                <select id="steps">
+                    <option value="80">Fast (80 steps)</option>
+                    <option value="150" selected>Balanced (150 steps)</option>
+                    <option value="200">High (200 steps)</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="suggestions">
+            <span style="font-size:0.8rem;color:#555;align-self:center">Try:</span>
+            <button onclick="setQuery('rough rocky stone surface')">rocky stone</button>
+            <button onclick="setQuery('green mossy grass field')">mossy grass</button>
+            <button onclick="setQuery('old cracked wood planks')">cracked wood</button>
+            <button onclick="setQuery('shiny metallic surface')">shiny metal</button>
+            <button onclick="setQuery('dry cracked lava ground')">lava ground</button>
+            <button onclick="setQuery('frozen ice crystal')">frozen ice</button>
+        </div>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="progress-bar" id="progressBar">
+        <div class="progress-fill"></div>
+    </div>
+
+    <div class="gallery" id="gallery">
+        <div class="empty-state">
+            <div class="icon">🎨</div>
+            <p>Enter a texture description above to generate variations</p>
+        </div>
+    </div>
+</main>
+
+<script>
+    const API = 'http://localhost:8000'
+
+    function setQuery(text) {
+        document.getElementById('queryInput').value = text
+        generate()
+    }
+
+    function setStatus(msg, type='') {
+        const el = document.getElementById('status')
+        el.textContent = msg
+        el.className   = 'status ' + type
+    }
+
+    function setLoading(loading) {
+        const btn  = document.getElementById('generateBtn')
+        const bar  = document.getElementById('progressBar')
+        btn.disabled  = loading
+        btn.textContent = loading ? 'Generating...' : 'Generate'
+        bar.className = loading ? 'progress-bar active' : 'progress-bar'
+    }
+
+    function download(b64, filename) {
+        const a    = document.createElement('a')
+        a.href     = 'data:image/png;base64,' + b64
+        a.download = filename
+        a.click()
+    }
+
+    async function generate() {
+        const query = document.getElementById('queryInput').value.trim()
+        if (!query) { setStatus('Please enter a texture description', 'error'); return }
+
+        const numVariations = parseInt(document.getElementById('numVariations').value)
+        const steps         = parseInt(document.getElementById('steps').value)
+
+        setLoading(true)
+        setStatus('Retrieving matching textures with CLIP...', 'loading')
+        document.getElementById('gallery').innerHTML = ''
+
+        try {
+            const res = await fetch(`${API}/generate`, {
+                method  : 'POST',
+                headers : { 'Content-Type': 'application/json' },
+                body    : JSON.stringify({ query, num_variations: numVariations, steps })
+            })
+
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.detail || 'Server error')
+            }
+
+            const data = await res.json()
+
+            setStatus(`Generated ${data.textures.length} textures for "${data.query}"`, 'success')
+            renderGallery(data)
+
+        } catch (err) {
+            setStatus('Error: ' + err.message, 'error')
+            document.getElementById('gallery').innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">⚠️</div>
+                    <p>${err.message}</p>
+                </div>`
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    function renderGallery(data) {
+        const gallery = document.getElementById('gallery')
+        gallery.innerHTML = ''
+
+        data.textures.forEach((tex, i) => {
+            const card = document.createElement('div')
+            card.className = 'texture-card'
+            card.innerHTML = `
+                <img src="data:image/png;base64,${tex.image_b64}" alt="texture ${i+1}">
+                <div class="card-footer">
+                    <span class="card-label">${tex.label}</span>
+                    <span class="card-score">score: ${tex.score.toFixed(3)}</span>
+                </div>
+                <button class="download-btn" onclick="download('${tex.image_b64}', 'texture_${data.query.replace(/ /g,'_')}_${i+1}.png')">
+                    Download PNG
+                </button>
+            `
+            gallery.appendChild(card)
+        })
+    }
+</script>
+
+</body>
+</html>
